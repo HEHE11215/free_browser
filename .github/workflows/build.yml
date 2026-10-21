@@ -17,19 +17,19 @@ jobs:
       - name: ☕ Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.22.2'
           channel: 'stable'
           cache: true
 
-      - name: 🏗️ Setup & Build
+      - name: 🏗️ Setup Project & Fix Gradle
         run: |
-          # Detect whether files are in root or in 'free_browser' subfolder
+          # Detect whether source is inside free_browser/ or at root
           if [ -d "free_browser/lib" ]; then
             SRC_DIR="free_browser"
           else
@@ -38,18 +38,45 @@ jobs:
 
           echo "Using source folder: $SRC_DIR"
 
-          # Create a clean Flutter project structure
+          # 1. Create fresh standard Flutter project
           flutter create app_builder \
             --project-name free_browser \
             --org com.freebrowser \
             --platforms android
 
-          # Copy our custom lib and pubspec
+          # 2. Copy our app files
           rm -rf app_builder/lib
           cp -r $SRC_DIR/lib app_builder/lib
-          cp $SRC_DIR/pubspec.yaml app_builder/pubspec.yaml
 
-          # Configure Android Manifest
+          # 3. Write a clean pubspec.yaml with stable inappwebview
+          cat > app_builder/pubspec.yaml << 'EOF'
+name: free_browser
+description: Ad-free YouTube browser with built-in uBlock-style ad blocker
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_inappwebview: ^6.0.0
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+EOF
+
+          # 4. Set minSdk to 21 directly in local.properties
+          echo "flutter.minSdkVersion=21" >> app_builder/android/local.properties
+
+          # 5. Configure AndroidManifest with permissions
           cat > app_builder/android/app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
@@ -81,11 +108,9 @@ jobs:
           </manifest>
           EOF
 
-          # Set minSdk to 21
+      - name: 📦 Build Release APK
+        run: |
           cd app_builder
-          sed -i 's/minSdk = flutter\.minSdkVersion/minSdk = 21/' android/app/build.gradle
-          sed -i 's/minSdkVersion flutter\.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
-
           flutter pub get
           flutter build apk --release --no-tree-shake-icons
 
