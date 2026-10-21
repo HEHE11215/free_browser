@@ -1,0 +1,97 @@
+name: 🚀 Build FreeBrowser APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: 🔨 Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: 🏗️ Setup & Build
+        run: |
+          # Detect whether files are in root or in 'free_browser' subfolder
+          if [ -d "free_browser/lib" ]; then
+            SRC_DIR="free_browser"
+          else
+            SRC_DIR="."
+          fi
+
+          echo "Using source folder: $SRC_DIR"
+
+          # Create a clean Flutter project structure
+          flutter create app_builder \
+            --project-name free_browser \
+            --org com.freebrowser \
+            --platforms android
+
+          # Copy our custom lib and pubspec
+          rm -rf app_builder/lib
+          cp -r $SRC_DIR/lib app_builder/lib
+          cp $SRC_DIR/pubspec.yaml app_builder/pubspec.yaml
+
+          # Configure Android Manifest
+          cat > app_builder/android/app/src/main/AndroidManifest.xml << 'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <application
+                  android:label="FreeBrowser"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true"
+                  android:hardwareAccelerated="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme"/>
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <meta-data android:name="flutterEmbedding" android:value="2"/>
+              </application>
+          </manifest>
+          EOF
+
+          # Set minSdk to 21
+          cd app_builder
+          sed -i 's/minSdk = flutter\.minSdkVersion/minSdk = 21/' android/app/build.gradle
+          sed -i 's/minSdkVersion flutter\.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
+
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeBrowser-v1.0-Android-APK
+          path: app_builder/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 90
