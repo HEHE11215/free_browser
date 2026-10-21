@@ -40,6 +40,9 @@ jobs:
           rm -rf app_builder/lib
           cp -r "$SRC_DIR/lib" app_builder/lib
 
+          # Fix the statusCode parameter name for flutter_inappwebview 6
+          sed -i 's/httpStatusCode: 200/statusCode: 200/g' app_builder/lib/screens/browser_screen.dart
+
           cd app_builder
           flutter pub add flutter_inappwebview:^6.0.0
           flutter pub add cupertino_icons:^1.0.6
