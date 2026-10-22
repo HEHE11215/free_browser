@@ -1,447 +1,344 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../services/ad_blocker_service.dart';
 
-class BrowserScreen extends StatefulWidget {
-  const BrowserScreen({super.key});
+class YouTubeAppScreen extends StatefulWidget {
+  const YouTubeAppScreen({super.key});
 
   @override
-  State<BrowserScreen> createState() => _BrowserScreenState();
+  State<YouTubeAppScreen> createState() => _YouTubeAppScreenState();
 }
 
-class _BrowserScreenState extends State<BrowserScreen> {
+class _YouTubeAppScreenState extends State<YouTubeAppScreen> {
   InAppWebViewController? _webController;
-  final TextEditingController _urlController = TextEditingController();
-  final FocusNode _urlFocusNode = FocusNode();
-
-  double _progress = 0;
+  int _currentTabIndex = 0;
+  int _adsBlockedCount = 0;
   bool _isLoading = false;
-  bool _canGoBack = false;
-  bool _canGoForward = false;
-  String _pageTitle = 'YouTube';
-  int _adsBlocked = 0;
+  double _progress = 0;
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
 
-  static const String _homeUrl = 'https://m.youtube.com';
+  static const String _homeUrl = 'https://m.youtube.com/';
+  static const String _shortsUrl = 'https://m.youtube.com/shorts';
+  static const String _subsUrl = 'https://m.youtube.com/feed/subscriptions';
+  static const String _libraryUrl = 'https://m.youtube.com/feed/library';
+  static const String _loginUrl = 'https://accounts.google.com/ServiceLogin?service=youtube';
 
-  // Mobile Chrome User-Agent so sites render in mobile mode
   static const String _userAgent =
-      'Mozilla/5.0 (Linux; Android 13; Pixel 7) '
-      'AppleWebKit/537.36 (KHTML, like Gecko) '
-      'Chrome/120.0.0.0 Mobile Safari/537.36';
-
-  @override
-  void initState() {
-    super.initState();
-    _urlController.text = _homeUrl;
-  }
+      'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.127 Mobile Safari/537.36';
 
   @override
   void dispose() {
-    _urlController.dispose();
-    _urlFocusNode.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  // ── Navigation helpers ────────────────────────────────────────────────────
+  void _loadUrl(String url) {
+    _webController?.loadUrl(
+      urlRequest: URLRequest(url: WebUri(url)),
+    );
+  }
 
-  void _go(String input) {
-    String url = input.trim();
-    if (url.isEmpty) return;
+  void _onTabSelected(int index) {
+    setState(() {
+      _currentTabIndex = index;
+      _isSearching = false;
+    });
 
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      // Looks like a domain?
-      if (RegExp(r'^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}').hasMatch(url) &&
-          !url.contains(' ')) {
-        url = 'https://$url';
-      } else {
-        // Google search
-        url =
-            'https://www.google.com/search?q=${Uri.encodeComponent(url)}&client=android';
-      }
+    switch (index) {
+      case 0:
+        _loadUrl(_homeUrl);
+        break;
+      case 1:
+        _loadUrl(_shortsUrl);
+        break;
+      case 2:
+        _loadUrl(_subsUrl);
+        break;
+      case 3:
+        _loadUrl(_libraryUrl);
+        break;
     }
-
-    _webController?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
-    _urlFocusNode.unfocus();
   }
 
-  Future<void> _refreshNavState() async {
-    final back = await _webController?.canGoBack() ?? false;
-    final forward = await _webController?.canGoForward() ?? false;
-    if (mounted) setState(() { _canGoBack = back; _canGoForward = forward; });
+  void _performSearch(String query) {
+    if (query.trim().isEmpty) return;
+    final encoded = Uri.encodeComponent(query.trim());
+    _loadUrl('https://m.youtube.com/results?search_query=$encoded');
+    setState(() {
+      _isSearching = false;
+    });
   }
 
-  // ── Ad-block helpers ──────────────────────────────────────────────────────
-
-  Future<void> _injectAdBlock(InAppWebViewController ctrl) async {
+  Future<void> _injectScripts(InAppWebViewController controller) async {
     try {
-      await ctrl.injectCSSCode(source: AdBlockerService.getAdBlockCSS());
-      await ctrl.evaluateJavascript(source: AdBlockerService.getAdBlockJS());
+      await controller.injectCSSCode(source: AdBlockerService.getAdBlockCSS());
+      await controller.evaluateJavascript(source: AdBlockerService.getAdBlockJS());
     } catch (_) {}
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            _buildProgressBar(),
-            Expanded(child: _buildWebView()),
-            _buildBottomBar(),
-          ],
+    return WillPopScope(
+      onWillPop: () async {
+        if (_isSearching) {
+          setState(() => _isSearching = false);
+          return false;
+        }
+        if (await _webController?.canGoBack() ?? false) {
+          _webController?.goBack();
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F0F0F),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(),
+              if (_isLoading)
+                LinearProgressIndicator(
+                  value: _progress > 0 && _progress < 1 ? _progress : null,
+                  backgroundColor: Colors.transparent,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
+                  minHeight: 2,
+                ),
+              Expanded(
+                child: InAppWebView(
+                  initialUrlRequest: URLRequest(url: WebUri(_homeUrl)),
+                  initialSettings: InAppWebViewSettings(
+                    javaScriptEnabled: true,
+                    domStorageEnabled: true,
+                    databaseEnabled: true,
+                    allowsInlineMediaPlayback: true,
+                    mediaPlaybackRequiresUserGesture: false,
+                    useWideViewPort: true,
+                    loadWithOverviewMode: true,
+                    userAgent: _userAgent,
+                    mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+                    cacheEnabled: true,
+                    hardwareAcceleration: true,
+                    supportMultipleWindows: false,
+                  ),
+                  onWebViewCreated: (controller) {
+                    _webController = controller;
+                  },
+                  onLoadStart: (controller, url) {
+                    setState(() => _isLoading = true);
+                    _injectScripts(controller);
+                  },
+                  onProgressChanged: (controller, progress) {
+                    setState(() => _progress = progress / 100);
+                    _injectScripts(controller);
+                  },
+                  onLoadStop: (controller, url) async {
+                    setState(() => _isLoading = false);
+                    await _injectScripts(controller);
+                  },
+                  shouldInterceptRequest: (controller, request) async {
+                    final url = request.url.toString();
+                    if (AdBlockerService.isAdUrl(url)) {
+                      if (mounted) {
+                        setState(() => _adsBlockedCount++);
+                      }
+                      return WebResourceResponse(
+                        contentType: 'text/plain',
+                        statusCode: 200,
+                        data: Uint8List(0),
+                      );
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              _buildBottomBar(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ── Top bar ───────────────────────────────────────────────────────────────
-
   Widget _buildTopBar() {
-    return Container(
-      height: 56,
-      color: const Color(0xFF1A1A1A),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Row(
-        children: [
-          // App icon / home
-          _iconBtn(
-            icon: Icons.play_circle_filled_rounded,
-            color: const Color(0xFFFF0000),
-            size: 30,
-            onTap: () => _go(_homeUrl),
-            tooltip: 'YouTube Home',
-          ),
-          const SizedBox(width: 6),
-
-          // URL bar
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                _urlFocusNode.requestFocus();
-                _urlController.selection = TextSelection(
-                  baseOffset: 0,
-                  extentOffset: _urlController.text.length,
-                );
-              },
+    if (_isSearching) {
+      return Container(
+        height: 52,
+        color: const Color(0xFF0F0F0F),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => setState(() => _isSearching = false),
+            ),
+            Expanded(
               child: Container(
                 height: 38,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2D2D2D),
-                  borderRadius: BorderRadius.circular(19),
-                  border: Border.all(
-                    color: _urlFocusNode.hasFocus
-                        ? const Color(0xFFFF0000).withOpacity(0.6)
-                        : Colors.transparent,
-                  ),
+                  color: const Color(0xFF222222),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                alignment: Alignment.centerLeft,
                 child: TextField(
-                  controller: _urlController,
-                  focusNode: _urlFocusNode,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontFamily: 'monospace',
-                  ),
+                  controller: _searchController,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: const InputDecoration(
+                    hintText: 'Search YouTube',
+                    hintStyle: TextStyle(color: Colors.white54, fontSize: 14),
                     border: InputBorder.none,
                     isDense: true,
-                    hintText: 'Search or enter URL…',
-                    hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
-                    contentPadding: EdgeInsets.zero,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
                   ),
-                  onSubmitted: _go,
-                  textInputAction: TextInputAction.go,
-                  autocorrect: false,
-                  keyboardType: TextInputType.url,
+                  onSubmitted: _performSearch,
+                  textInputAction: TextInputAction.search,
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 6),
+            IconButton(
+              icon: const Icon(Icons.search, color: Colors.white),
+              onPressed: () => _performSearch(_searchController.text),
+            ),
+          ],
+        ),
+      );
+    }
 
-          // Reload / Stop
-          _iconBtn(
-            icon: _isLoading ? Icons.close_rounded : Icons.refresh_rounded,
-            color: Colors.white70,
-            onTap: () {
-              if (_isLoading) {
-                _webController?.stopLoading();
-              } else {
-                _webController?.reload();
-              }
-            },
-            tooltip: _isLoading ? 'Stop' : 'Reload',
+    return Container(
+      height: 52,
+      color: const Color(0xFF0F0F0F),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF0000),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: const Center(
+                  child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+                ),
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'YouTube',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D220D),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF4ADE80).withOpacity(0.4)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.shield, color: Color(0xFF4ADE80), size: 14),
+                const SizedBox(width: 3),
+                Text(
+                  '$_adsBlockedCount',
+                  style: const TextStyle(
+                    color: Color(0xFF4ADE80),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.white, size: 22),
+            onPressed: () => setState(() => _isSearching = true),
+          ),
+          GestureDetector(
+            onTap: () => _loadUrl(_loginUrl),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF3EA6FF)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.account_circle_outlined, color: Color(0xFF3EA6FF), size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'Sign in',
+                    style: TextStyle(
+                      color: Color(0xFF3EA6FF),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
-
-  // ── Progress bar ──────────────────────────────────────────────────────────
-
-  Widget _buildProgressBar() {
-    if (!_isLoading) return const SizedBox(height: 2);
-    return LinearProgressIndicator(
-      value: _progress,
-      minHeight: 2,
-      backgroundColor: Colors.transparent,
-      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
-    );
-  }
-
-  // ── WebView ───────────────────────────────────────────────────────────────
-
-  Widget _buildWebView() {
-    return InAppWebView(
-      initialUrlRequest: URLRequest(url: WebUri(_homeUrl)),
-      initialSettings: InAppWebViewSettings(
-        javaScriptEnabled: true,
-        domStorageEnabled: true,
-        databaseEnabled: true,
-        allowsInlineMediaPlayback: true,
-        mediaPlaybackRequiresUserGesture: false,
-        supportZoom: true,
-        useWideViewPort: true,
-        loadWithOverviewMode: true,
-        transparentBackground: false,
-        useShouldOverrideUrlLoading: true,
-        useShouldInterceptRequest: true,
-        userAgent: _userAgent,
-        contentBlockers: AdBlockerService.getContentBlockers(),
-      ),
-      onWebViewCreated: (ctrl) => _webController = ctrl,
-      onLoadStart: (ctrl, url) {
-        setState(() {
-          _isLoading = true;
-          _urlController.text = url?.toString() ?? '';
-        });
-      },
-      onLoadStop: (ctrl, url) async {
-        setState(() {
-          _isLoading = false;
-          _urlController.text = url?.toString() ?? '';
-        });
-        await _injectAdBlock(ctrl);
-        await _refreshNavState();
-      },
-      onProgressChanged: (ctrl, progress) {
-        setState(() => _progress = progress / 100);
-      },
-      onTitleChanged: (ctrl, title) {
-        if (title != null && title.isNotEmpty && mounted) {
-          setState(() => _pageTitle = title);
-        }
-      },
-      onReceivedError: (ctrl, req, err) {
-        setState(() => _isLoading = false);
-      },
-      // Block ad resources at the WebView level
-      shouldInterceptRequest: (ctrl, request) async {
-        final url = request.url.toString();
-        final isAd = AdBlockerService.getContentBlockers().any((blocker) {
-          final pattern = blocker.trigger.urlFilter;
-          if (pattern == null) return false;
-          return RegExp(pattern).hasMatch(url);
-        });
-
-        if (isAd) {
-          if (mounted) setState(() => _adsBlocked++);
-          // Return empty response to block
-          return WebResourceResponse(
-            contentType: 'text/plain',
-            httpStatusCode: 200,
-            data: Uint8List(0),
-          );
-        }
-        return null; // Allow
-      },
-      onNavigationResponse: (ctrl, response) async =>
-          NavigationResponseAction.ALLOW,
-    );
-  }
-
-  // ── Bottom bar ────────────────────────────────────────────────────────────
 
   Widget _buildBottomBar() {
     return Container(
-      height: 56,
-      color: const Color(0xFF1A1A1A),
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      height: 54,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F0F0F),
+        border: Border(top: BorderSide(color: Color(0xFF222222), width: 0.5)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navBtn(
-            icon: Icons.arrow_back_ios_new_rounded,
-            enabled: _canGoBack,
-            onTap: () => _webController?.goBack(),
-          ),
-          _navBtn(
-            icon: Icons.arrow_forward_ios_rounded,
-            enabled: _canGoForward,
-            onTap: () => _webController?.goForward(),
-          ),
-          _navBtn(
-            icon: Icons.home_rounded,
-            enabled: true,
-            color: const Color(0xFFFF0000),
-            onTap: () => _go(_homeUrl),
-          ),
-          // Ads blocked counter
-          _adsBlockedBadge(),
-          _navBtn(
-            icon: Icons.more_vert_rounded,
-            enabled: true,
-            onTap: _showMenu,
-          ),
+          _navItem(0, Icons.home_filled, Icons.home_outlined, 'Home'),
+          _navItem(1, Icons.bolt, Icons.bolt_outlined, 'Shorts'),
+          _navItem(2, Icons.subscriptions, Icons.subscriptions_outlined, 'Subscriptions'),
+          _navItem(3, Icons.video_library, Icons.video_library_outlined, 'You'),
         ],
       ),
     );
   }
 
-  Widget _adsBlockedBadge() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 20),
-        const SizedBox(height: 1),
-        Text(
-          '$_adsBlocked',
-          style: const TextStyle(
-            color: Colors.greenAccent,
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Menu ──────────────────────────────────────────────────────────────────
-
-  void _showMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+  Widget _navItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
+    final isSelected = _currentTabIndex == index;
+    return InkWell(
+      onTap: () => _onTabSelected(index),
+      child: SizedBox(
+        width: 70,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
+            Icon(
+              isSelected ? activeIcon : inactiveIcon,
+              color: isSelected ? Colors.white : Colors.white60,
+              size: 22,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white60,
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
-            ),
-            const SizedBox(height: 16),
-            _menuTile(
-              icon: Icons.copy_rounded,
-              label: 'Copy URL',
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: _urlController.text));
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('URL copied!'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
-            ),
-            _menuTile(
-              icon: Icons.open_in_new_rounded,
-              label: 'Open in YouTube App',
-              onTap: () {
-                Navigator.pop(context);
-                // Optionally launch intent
-              },
-            ),
-            _menuTile(
-              icon: Icons.shield_rounded,
-              label: 'Ads blocked this session: $_adsBlocked',
-              color: Colors.greenAccent,
-              onTap: () => Navigator.pop(context),
-            ),
-            _menuTile(
-              icon: Icons.home_rounded,
-              label: 'Go to YouTube Home',
-              onTap: () { Navigator.pop(context); _go(_homeUrl); },
-            ),
-            _menuTile(
-              icon: Icons.refresh_rounded,
-              label: 'Reload Page',
-              onTap: () { Navigator.pop(context); _webController?.reload(); },
             ),
           ],
         ),
       ),
-    );
-  }
-
-  // ── Helper widgets ────────────────────────────────────────────────────────
-
-  Widget _iconBtn({
-    required IconData icon,
-    required VoidCallback onTap,
-    Color color = Colors.white70,
-    double size = 24,
-    String? tooltip,
-  }) {
-    return Tooltip(
-      message: tooltip ?? '',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Icon(icon, color: color, size: size),
-        ),
-      ),
-    );
-  }
-
-  Widget _navBtn({
-    required IconData icon,
-    required bool enabled,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(24),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(
-          icon,
-          color: enabled ? (color ?? Colors.white70) : Colors.white24,
-          size: 22,
-        ),
-      ),
-    );
-  }
-
-  Widget _menuTile({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    Color color = Colors.white70,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: color, size: 22),
-      title: Text(label, style: TextStyle(color: color, fontSize: 14)),
-      onTap: onTap,
     );
   }
 }
