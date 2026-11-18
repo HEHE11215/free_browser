@@ -131,30 +131,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF6B68), Color(0xFFD52B60)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFE94352).withOpacity(0.3),
-                      blurRadius: 16,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 30,
-                ),
-              ),
+              const _OpenWaveMark(),
               const SizedBox(width: 12),
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -747,6 +724,68 @@ class _VideoArtwork extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OpenWaveMark extends StatelessWidget {
+  const _OpenWaveMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE94352),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE94352).withOpacity(0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: CustomPaint(painter: _OpenWaveMarkPainter()),
+    );
+  }
+}
+
+class _OpenWaveMarkPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 108);
+    final ringPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final ring = Path()
+      ..moveTo(77, 34)
+      ..cubicTo(71, 27, 63, 23, 54, 23)
+      ..cubicTo(36, 23, 22, 37, 22, 54)
+      ..cubicTo(22, 71, 36, 85, 54, 85)
+      ..cubicTo(63, 85, 71, 81, 77, 74);
+    canvas.drawPath(ring, ringPaint);
+
+    final play = Path()
+      ..moveTo(46, 40.5)
+      ..lineTo(67, 52.3)
+      ..quadraticBezierTo(69, 54, 67, 55.7)
+      ..lineTo(46, 67.5)
+      ..quadraticBezierTo(43, 69, 43, 65.8)
+      ..lineTo(43, 42.2)
+      ..quadraticBezierTo(43, 39, 46, 40.5);
+    canvas.drawPath(
+      play,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _OpenWaveMarkPainter oldDelegate) => false;
 }
 
 class _VideoScreen extends StatefulWidget {
