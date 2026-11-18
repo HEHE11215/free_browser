@@ -129,8 +129,8 @@ class MainActivity : FlutterActivity() {
             .setMimeType("video/mp4")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-            .setAllowedOverMetered(true)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            request.setAllowedOverMetered(true)
             request.setAllowedOverRoaming(false)
         }
 
