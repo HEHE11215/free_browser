@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 class BrowserScreen extends StatefulWidget {
@@ -373,8 +372,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      _VideoDownloadButton(video: video, compact: true),
                     ],
                   ),
                 ],
@@ -562,105 +559,10 @@ class _VideoCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                _VideoDownloadButton(video: video, compact: true),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _VideoDownloadButton extends StatefulWidget {
-  const _VideoDownloadButton({
-    required this.video,
-    this.compact = false,
-  });
-
-  final _Video video;
-  final bool compact;
-
-  @override
-  State<_VideoDownloadButton> createState() => _VideoDownloadButtonState();
-}
-
-class _VideoDownloadButtonState extends State<_VideoDownloadButton> {
-  static const MethodChannel _channel =
-      MethodChannel('com.freebrowser.free_browser/downloads');
-
-  bool _isDownloading = false;
-
-  Future<void> _download() async {
-    setState(() => _isDownloading = true);
-    try {
-      await _channel.invokeMethod<int>(
-        'downloadVideo',
-        {'url': widget.video.url, 'title': widget.video.title},
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download started. Check Downloads.')),
-        );
-      }
-    } on PlatformException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message ?? 'Could not start the download.')),
-        );
-      }
-    } on MissingPluginException {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Downloads are not available on this device.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isDownloading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = SizedBox(
-      width: 16,
-      height: 16,
-      child: CircularProgressIndicator(
-        strokeWidth: 2,
-        color: widget.compact ? Colors.white : Colors.black,
-      ),
-    );
-
-    if (widget.compact) {
-      return FilledButton.tonalIcon(
-        onPressed: _isDownloading ? null : _download,
-        style: FilledButton.styleFrom(
-          foregroundColor: Colors.white,
-          backgroundColor: Colors.white.withOpacity(0.14),
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-          visualDensity: VisualDensity.compact,
-        ),
-        icon: _isDownloading
-            ? progress
-            : const Icon(Icons.download_rounded, size: 17),
-        label: const Text(
-          'Download',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-        ),
-      );
-    }
-
-    return FilledButton.icon(
-      onPressed: _isDownloading ? null : _download,
-      icon: _isDownloading
-          ? progress
-          : const Icon(Icons.download_rounded, size: 19),
-      label: const Text('Download video'),
-      style: FilledButton.styleFrom(
-        backgroundColor: const Color(0xFFE94352),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       ),
     );
   }
@@ -977,7 +879,6 @@ class _VideoScreenState extends State<_VideoScreen> {
               _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
             ),
           ),
-          _VideoDownloadButton(video: video),
         ],
       ),
       body: ListView(
