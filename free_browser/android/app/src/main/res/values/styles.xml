@@ -6,7 +6,7 @@
     </style>
 
     <style name="NormalTheme" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#14151B</item>
+        <item name="android:windowBackground">@color/openwave_background</item>
         <item name="android:colorAccent">#E94352</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
