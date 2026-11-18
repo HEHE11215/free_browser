@@ -74,24 +74,25 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                 children: [
                   Text(
-                    _showLibrary ? 'Your library' : 'Home',
+                    _showLibrary ? 'Saved for later' : 'What are we watching?',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontSize: 26,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.8,
                         ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 7),
                   Text(
                     _showLibrary
-                        ? 'Your bookmarked videos, all in one place.'
-                        : 'Good stories. Press play and settle in.',
-                    style: const TextStyle(color: Colors.white60, fontSize: 13),
+                        ? 'Your favorites, ready whenever you are.'
+                        : 'A hand-picked collection, with nothing in the way.',
+                    style: const TextStyle(color: Colors.white60, fontSize: 14),
                   ),
                   if (featuredVideo != null) ...[
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 24),
                     _buildFeaturedVideo(featuredVideo),
                   ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                   if (videos.isEmpty)
                     _buildEmptyState()
                   else ...[
@@ -104,10 +105,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
                         letterSpacing: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 15),
                     for (final video in listVideos)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.only(bottom: 18),
                         child: _VideoCard(
                           video: video,
                           onTap: () => _openVideo(video),
@@ -125,60 +126,85 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   Widget _buildTopBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 12, 20),
+      padding: const EdgeInsets.fromLTRB(20, 14, 16, 20),
       child: Column(
         children: [
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE94352),
-                  borderRadius: BorderRadius.circular(13),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6B68), Color(0xFFD52B60)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE94352).withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.play_arrow_rounded,
                   color: Colors.white,
-                  size: 28,
+                  size: 30,
                 ),
               ),
-              const SizedBox(width: 10),
-              const Text(
-                'OpenWave',
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.7,
-                ),
+              const SizedBox(width: 12),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'OPENWAVE',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.6,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'WATCH SOMETHING GOOD',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
               ),
               const Spacer(),
-              TextButton.icon(
+              IconButton.filledTonal(
+                tooltip: _showLibrary ? 'Go home' : 'Saved videos',
                 onPressed: () => setState(() => _showLibrary = !_showLibrary),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFF242630),
+                  foregroundColor: Colors.white,
+                ),
                 icon: Icon(
                   _showLibrary
                       ? Icons.home_rounded
                       : Icons.bookmark_border_rounded,
-                  size: 19,
-                ),
-                label: Text(_showLibrary ? 'Home' : 'Saved'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           SizedBox(
-            height: 46,
+            height: 50,
             child: TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Search videos or creators',
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                hintText: 'Search by title or creator',
+                prefixIcon: const Icon(Icons.search_rounded, size: 21),
                 suffixIcon: _searchController.text.isEmpty
                     ? null
                     : IconButton(
@@ -190,11 +216,22 @@ class _BrowserScreenState extends State<BrowserScreen> {
                         },
                       ),
                 filled: true,
-                fillColor: const Color(0xFF1B1D24),
+                fillColor: const Color(0xFF191B22),
                 contentPadding: EdgeInsets.zero,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(17),
+                  borderSide: const BorderSide(color: Color(0xFF2E3039)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(17),
+                  borderSide: const BorderSide(color: Color(0xFF2E3039)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(17),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFE94352),
+                    width: 1.4,
+                  ),
                 ),
               ),
             ),
@@ -209,14 +246,18 @@ class _BrowserScreenState extends State<BrowserScreen> {
       onTap: () => _openVideo(video),
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        height: 265,
+        height: 314,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: video.colors,
-          ),
+          color: const Color(0xFF191A20),
+          border: Border.all(color: Colors.white.withOpacity(0.11)),
+          boxShadow: [
+            BoxShadow(
+              color: video.colors.first.withOpacity(0.2),
+              blurRadius: 28,
+              offset: const Offset(0, 12),
+            ),
+          ],
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
@@ -225,10 +266,23 @@ class _BrowserScreenState extends State<BrowserScreen> {
             Positioned(
               top: 5,
               right: 3,
-              child: Icon(
-                video.artworkIcon,
-                size: 195,
-                color: Colors.white.withOpacity(0.13),
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      video.colors.last.withOpacity(0.75),
+                      video.colors.first.withOpacity(0.04),
+                    ],
+                  ),
+                ),
+                child: Icon(
+                  video.artworkIcon,
+                  size: 148,
+                  color: Colors.white.withOpacity(0.68),
+                ),
               ),
             ),
             Positioned(
@@ -242,9 +296,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24),
                 ),
                 child: const Text(
-                  'FEATURED',
+                  'EDITOR\'S PICK',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -254,9 +309,37 @@ class _BrowserScreenState extends State<BrowserScreen> {
               ),
             ),
             Positioned(
+              top: 22,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.28),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.high_quality_rounded, size: 15),
+                    SizedBox(width: 4),
+                    Text(
+                      'MP4',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
               left: 20,
               right: 20,
-              bottom: 20,
+              bottom: 18,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -281,35 +364,41 @@ class _BrowserScreenState extends State<BrowserScreen> {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 13,
-                      vertical: 9,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.black,
-                          size: 20,
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 13,
+                          vertical: 9,
                         ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Watch now',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(22),
                         ),
-                      ],
-                    ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.play_arrow_rounded,
+                              color: Colors.black,
+                              size: 20,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Watch now',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _VideoDownloadButton(video: video, compact: true),
+                    ],
                   ),
                 ],
               ),
@@ -363,65 +452,238 @@ class _VideoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF17191F),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 126,
-                child: _VideoArtwork(video: video),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      video.category.toUpperCase(),
-                      style: TextStyle(
-                        color: video.accent,
-                        fontSize: 9,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w800,
+      color: const Color(0xFF191B22),
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onTap,
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: video.colors,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      video.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
+                  ),
+                  Positioned(
+                    right: 12,
+                    top: -25,
+                    bottom: -25,
+                    child: Icon(
+                      video.artworkIcon,
+                      size: 180,
+                      color: Colors.white.withOpacity(0.18),
+                    ),
+                  ),
+                  Positioned(
+                    top: 14,
+                    left: 14,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.24),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        video.category.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          letterSpacing: 1.3,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      video.creator,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 11,
+                  ),
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.25),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white54),
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 30,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.42),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'MP4',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.play_circle_outline_rounded,
-                color: Colors.white70,
-              ),
-            ],
+            ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(15, 13, 12, 13),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 19,
+                  backgroundColor: video.accent.withOpacity(0.18),
+                  child: Icon(video.creatorIcon, color: video.accent, size: 20),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: InkWell(
+                    onTap: onTap,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          video.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          video.creator,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _VideoDownloadButton(video: video, compact: true),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoDownloadButton extends StatefulWidget {
+  const _VideoDownloadButton({
+    required this.video,
+    this.compact = false,
+  });
+
+  final _Video video;
+  final bool compact;
+
+  @override
+  State<_VideoDownloadButton> createState() => _VideoDownloadButtonState();
+}
+
+class _VideoDownloadButtonState extends State<_VideoDownloadButton> {
+  static const MethodChannel _channel =
+      MethodChannel('com.freebrowser.free_browser/downloads');
+
+  bool _isDownloading = false;
+
+  Future<void> _download() async {
+    setState(() => _isDownloading = true);
+    try {
+      await _channel.invokeMethod<int>(
+        'downloadVideo',
+        {'url': widget.video.url, 'title': widget.video.title},
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download started. Check Downloads.')),
+        );
+      }
+    } on PlatformException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? 'Could not start the download.')),
+        );
+      }
+    } on MissingPluginException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Downloads are not available on this device.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = SizedBox(
+      width: 16,
+      height: 16,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        color: widget.compact ? Colors.white : Colors.black,
+      ),
+    );
+
+    if (widget.compact) {
+      return FilledButton.tonalIcon(
+        onPressed: _isDownloading ? null : _download,
+        style: FilledButton.styleFrom(
+          foregroundColor: Colors.white,
+          backgroundColor: Colors.white.withOpacity(0.14),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+          visualDensity: VisualDensity.compact,
         ),
+        icon: _isDownloading
+            ? progress
+            : const Icon(Icons.download_rounded, size: 17),
+        label: const Text(
+          'Download',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        ),
+      );
+    }
+
+    return FilledButton.icon(
+      onPressed: _isDownloading ? null : _download,
+      icon: _isDownloading
+          ? progress
+          : const Icon(Icons.download_rounded, size: 19),
+      label: const Text('Download video'),
+      style: FilledButton.styleFrom(
+        backgroundColor: const Color(0xFFE94352),
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       ),
     );
   }
@@ -503,13 +765,9 @@ class _VideoScreen extends StatefulWidget {
 }
 
 class _VideoScreenState extends State<_VideoScreen> {
-  static const MethodChannel _downloadChannel =
-      MethodChannel('com.freebrowser.free_browser/downloads');
-
   VideoPlayerController? _controller;
   late bool _isSaved = widget.isSaved;
   bool _isLoading = true;
-  bool _isDownloading = false;
   String? _playerError;
 
   @override
@@ -550,35 +808,6 @@ class _VideoScreenState extends State<_VideoScreen> {
       setState(() {
         _playerError = 'Playback stopped. Check your connection and try again.';
       });
-    }
-  }
-
-  Future<void> _downloadVideo() async {
-    setState(() => _isDownloading = true);
-    try {
-      await _downloadChannel.invokeMethod<int>(
-        'downloadVideo',
-        {'url': widget.video.url, 'title': widget.video.title},
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download started. Check Downloads.')),
-        );
-      }
-    } on PlatformException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message ?? 'Could not start the download.')),
-        );
-      }
-    } on MissingPluginException {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Downloads are not available on this device.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isDownloading = false);
     }
   }
 
@@ -709,17 +938,7 @@ class _VideoScreenState extends State<_VideoScreen> {
               _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
             ),
           ),
-          IconButton(
-            tooltip: 'Download video',
-            onPressed: _isDownloading ? null : _downloadVideo,
-            icon: _isDownloading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.download_rounded),
-          ),
+          _VideoDownloadButton(video: video),
         ],
       ),
       body: ListView(

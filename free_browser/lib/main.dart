@@ -36,11 +36,11 @@ class FreeBrowserApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF0000),
+            seedColor: const Color(0xFFE94352),
           brightness: Brightness.dark,
-          surface: const Color(0xFF0F0F0F),
+            surface: const Color(0xFF14151B),
         ),
-        scaffoldBackgroundColor: const Color(0xFF0F0F0F),
+          scaffoldBackgroundColor: const Color(0xFF14151B),
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
