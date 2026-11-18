@@ -1,32 +1,32 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import '../services/ad_blocker_service.dart';
 
-class YouTubeAppScreen extends StatefulWidget {
-  const YouTubeAppScreen({super.key});
+class BrowserScreen extends StatefulWidget {
+  const BrowserScreen({super.key});
 
   @override
-  State<YouTubeAppScreen> createState() => _YouTubeAppScreenState();
+  State<BrowserScreen> createState() => _BrowserScreenState();
 }
 
-class _YouTubeAppScreenState extends State<YouTubeAppScreen> {
-  InAppWebViewController? _webController;
-  int _currentTabIndex = 0;
-  int _adsBlockedCount = 0;
-  bool _isLoading = false;
-  double _progress = 0;
-  bool _isSearching = false;
+class _BrowserScreenState extends State<BrowserScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final Set<String> _savedVideoIds = {};
+  int _selectedTab = 0;
+  String _selectedCategory = 'All';
 
-  static const String _homeUrl = 'https://m.youtube.com/';
-  static const String _shortsUrl = 'https://m.youtube.com/shorts';
-  static const String _subsUrl = 'https://m.youtube.com/feed/subscriptions';
-  static const String _libraryUrl = 'https://m.youtube.com/feed/library';
-  static const String _loginUrl = 'https://accounts.google.com/ServiceLogin?service=youtube';
-
-  static const String _userAgent =
-      'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.127 Mobile Safari/537.36';
+  List<_Video> get _visibleVideos {
+    final query = _searchController.text.trim().toLowerCase();
+    return _videos.where((video) {
+      final matchesTab = _selectedTab != 2 || _savedVideoIds.contains(video.id);
+      final matchesCategory =
+          _selectedCategory == 'All' || video.category == _selectedCategory;
+      final matchesSearch = query.isEmpty ||
+          video.title.toLowerCase().contains(query) ||
+          video.creator.toLowerCase().contains(query) ||
+          video.category.toLowerCase().contains(query);
+      return matchesTab && matchesCategory && matchesSearch;
+    }).toList();
+  }
 
   @override
   void dispose() {
@@ -34,306 +34,386 @@ class _YouTubeAppScreenState extends State<YouTubeAppScreen> {
     super.dispose();
   }
 
-  void _loadUrl(String url) {
-    _webController?.loadUrl(
-      urlRequest: URLRequest(url: WebUri(url)),
+  void _toggleSaved(_Video video) {
+    setState(() {
+      if (!_savedVideoIds.add(video.id)) {
+        _savedVideoIds.remove(video.id);
+      }
+    });
+  }
+
+  void _openVideo(_Video video) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _VideoScreen(
+          video: video,
+          isSaved: _savedVideoIds.contains(video.id),
+          onSave: () => _toggleSaved(video),
+        ),
+      ),
     );
-  }
-
-  void _onTabSelected(int index) {
-    setState(() {
-      _currentTabIndex = index;
-      _isSearching = false;
-    });
-
-    switch (index) {
-      case 0:
-        _loadUrl(_homeUrl);
-        break;
-      case 1:
-        _loadUrl(_shortsUrl);
-        break;
-      case 2:
-        _loadUrl(_subsUrl);
-        break;
-      case 3:
-        _loadUrl(_libraryUrl);
-        break;
-    }
-  }
-
-  void _performSearch(String query) {
-    if (query.trim().isEmpty) return;
-    final encoded = Uri.encodeComponent(query.trim());
-    _loadUrl('https://m.youtube.com/results?search_query=$encoded');
-    setState(() {
-      _isSearching = false;
-    });
-  }
-
-  Future<void> _injectScripts(InAppWebViewController controller) async {
-    try {
-      await controller.injectCSSCode(source: AdBlockerService.getAdBlockCSS());
-      await controller.evaluateJavascript(source: AdBlockerService.getAdBlockJS());
-    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        if (_isSearching) {
-          setState(() => _isSearching = false);
-          return false;
-        }
-        if (await _webController?.canGoBack() ?? false) {
-          _webController?.goBack();
-          return false;
-        }
-        return true;
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0F0F0F),
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildTopBar(),
-              if (_isLoading)
-                LinearProgressIndicator(
-                  value: _progress > 0 && _progress < 1 ? _progress : null,
-                  backgroundColor: Colors.transparent,
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF0000)),
-                  minHeight: 2,
-                ),
-              Expanded(
-                child: InAppWebView(
-                  initialUrlRequest: URLRequest(url: WebUri(_homeUrl)),
-                  initialSettings: InAppWebViewSettings(
-                    javaScriptEnabled: true,
-                    domStorageEnabled: true,
-                    databaseEnabled: true,
-                    allowsInlineMediaPlayback: true,
-                    mediaPlaybackRequiresUserGesture: false,
-                    useWideViewPort: true,
-                    loadWithOverviewMode: true,
-                    userAgent: _userAgent,
-                    mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
-                    cacheEnabled: true,
-                    hardwareAcceleration: true,
-                    supportMultipleWindows: false,
+    final videos = _visibleVideos;
+    final isLibrary = _selectedTab == 2;
+
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _buildTopBar(),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+                children: [
+                  Text(
+                    isLibrary
+                        ? 'Your library'
+                        : _selectedTab == 1
+                            ? 'Find something good'
+                            : 'A little inspiration',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
                   ),
-                  onWebViewCreated: (controller) {
-                    _webController = controller;
-                  },
-                  onLoadStart: (controller, url) {
-                    setState(() => _isLoading = true);
-                    _injectScripts(controller);
-                  },
-                  onProgressChanged: (controller, progress) {
-                    setState(() => _progress = progress / 100);
-                    _injectScripts(controller);
-                  },
-                  onLoadStop: (controller, url) async {
-                    setState(() => _isLoading = false);
-                    await _injectScripts(controller);
-                  },
-                  shouldInterceptRequest: (controller, request) async {
-                    final url = request.url.toString();
-                    if (AdBlockerService.isAdUrl(url)) {
-                      if (mounted) {
-                        setState(() => _adsBlockedCount++);
-                      }
-                      return WebResourceResponse(
-                        contentType: 'text/plain',
-                        statusCode: 200,
-                        data: Uint8List(0),
-                      );
-                    }
-                    return null;
-                  },
-                ),
+                  const SizedBox(height: 6),
+                  Text(
+                    isLibrary
+                        ? 'Videos you saved for later.'
+                        : 'Great videos, ready when you are.',
+                    style: const TextStyle(color: Colors.white60, fontSize: 14),
+                  ),
+                  if (!isLibrary) ...[
+                    const SizedBox(height: 20),
+                    _buildCategories(),
+                  ],
+                  const SizedBox(height: 18),
+                  if (videos.isEmpty)
+                    _buildEmptyState(isLibrary)
+                  else ...[
+                    Text(
+                      isLibrary ? 'SAVED VIDEOS' : 'PICKED FOR YOU',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    for (final video in videos)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 22),
+                        child: _VideoCard(
+                          video: video,
+                          isSaved: _savedVideoIds.contains(video.id),
+                          onTap: () => _openVideo(video),
+                          onSave: () => _toggleSaved(video),
+                        ),
+                      ),
+                  ],
+                ],
               ),
-              _buildBottomBar(),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedTab,
+        onDestinationSelected: (index) {
+          setState(() {
+            _selectedTab = index;
+            _selectedCategory = 'All';
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore_rounded),
+            label: 'Explore',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bookmark_border_rounded),
+            selectedIcon: Icon(Icons.bookmark_rounded),
+            label: 'Library',
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildTopBar() {
-    if (_isSearching) {
-      return Container(
-        height: 52,
-        color: const Color(0xFF0F0F0F),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => setState(() => _isSearching = false),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE94352),
+              borderRadius: BorderRadius.circular(12),
             ),
-            Expanded(
-              child: Container(
-                height: 38,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF222222),
+            child: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          const Text(
+            'openwave',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.8,
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: SizedBox(
+              height: 42,
+              child: TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Search videos',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        ),
+                  filled: true,
+                  fillColor: const Color(0xFF202127),
+                  contentPadding: EdgeInsets.zero,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategories() {
+    return SizedBox(
+      height: 38,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (final category in _categories)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(category),
+                selected: _selectedCategory == category,
+                onSelected: (_) => setState(() => _selectedCategory = category),
+                showCheckmark: false,
+                labelStyle: TextStyle(
+                  color: _selectedCategory == category
+                      ? Colors.black
+                      : Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                selectedColor: const Color(0xFFF2F0EA),
+                backgroundColor: const Color(0xFF202127),
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: const InputDecoration(
-                    hintText: 'Search YouTube',
-                    hintStyle: TextStyle(color: Colors.white54, fontSize: 14),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  onSubmitted: _performSearch,
-                  textInputAction: TextInputAction.search,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isLibrary) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 54),
+      child: Column(
+        children: [
+          Icon(
+            isLibrary ? Icons.bookmark_border_rounded : Icons.search_rounded,
+            size: 42,
+            color: Colors.white38,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            isLibrary ? 'Nothing saved yet' : 'No videos found',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isLibrary
+                ? 'Tap the bookmark on a video to keep it here.'
+                : 'Try another title, creator, or category.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoCard extends StatelessWidget {
+  const _VideoCard({
+    required this.video,
+    required this.isSaved,
+    required this.onTap,
+    required this.onSave,
+  });
+
+  final _Video video;
+  final bool isSaved;
+  final VoidCallback onTap;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: _VideoArtwork(video: video),
+        ),
+        const SizedBox(height: 11),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 17,
+              backgroundColor: video.accent.withOpacity(0.24),
+              child: Icon(video.creatorIcon, size: 19, color: video.accent),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: InkWell(
+                onTap: onTap,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      video.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${video.creator}  ·  ${video.category}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.search, color: Colors.white),
-              onPressed: () => _performSearch(_searchController.text),
+              tooltip: isSaved ? 'Remove from library' : 'Save to library',
+              onPressed: onSave,
+              icon: Icon(
+                isSaved
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                color: isSaved ? const Color(0xFFFF7883) : Colors.white70,
+              ),
             ),
           ],
         ),
-      );
-    }
-
-    return Container(
-      height: 52,
-      color: const Color(0xFF0F0F0F),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 26,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF0000),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: const Center(
-                  child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
-                ),
-              ),
-              const SizedBox(width: 5),
-              const Text(
-                'YouTube',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0D220D),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF4ADE80).withOpacity(0.4)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.shield, color: Color(0xFF4ADE80), size: 14),
-                const SizedBox(width: 3),
-                Text(
-                  '$_adsBlockedCount',
-                  style: const TextStyle(
-                    color: Color(0xFF4ADE80),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white, size: 22),
-            onPressed: () => setState(() => _isSearching = true),
-          ),
-          GestureDetector(
-            onTap: () => _loadUrl(_loginUrl),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF3EA6FF)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.account_circle_outlined, color: Color(0xFF3EA6FF), size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    'Sign in',
-                    style: TextStyle(
-                      color: Color(0xFF3EA6FF),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
+}
 
-  Widget _buildBottomBar() {
-    return Container(
-      height: 54,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F0F0F),
-        border: Border(top: BorderSide(color: Color(0xFF222222), width: 0.5)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(0, Icons.home_filled, Icons.home_outlined, 'Home'),
-          _navItem(1, Icons.bolt, Icons.bolt_outlined, 'Shorts'),
-          _navItem(2, Icons.subscriptions, Icons.subscriptions_outlined, 'Subscriptions'),
-          _navItem(3, Icons.video_library, Icons.video_library_outlined, 'You'),
-        ],
-      ),
-    );
-  }
+class _VideoArtwork extends StatelessWidget {
+  const _VideoArtwork({required this.video});
 
-  Widget _navItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
-    final isSelected = _currentTabIndex == index;
-    return InkWell(
-      onTap: () => _onTabSelected(index),
-      child: SizedBox(
-        width: 70,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  final _Video video;
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Icon(
-              isSelected ? activeIcon : inactiveIcon,
-              color: isSelected ? Colors.white : Colors.white60,
-              size: 22,
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: video.colors,
+                ),
+              ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white60,
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            Positioned(
+              right: 24,
+              top: 10,
+              bottom: 10,
+              child: Icon(
+                video.artworkIcon,
+                size: 130,
+                color: Colors.white.withOpacity(0.13),
+              ),
+            ),
+            Positioned(
+              left: 18,
+              top: 16,
+              child: Text(
+                video.category.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.6,
+                ),
+              ),
+            ),
+            Center(
+              child: Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.3),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withOpacity(0.6)),
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 34,
+                ),
               ),
             ),
           ],
@@ -342,3 +422,223 @@ class _YouTubeAppScreenState extends State<YouTubeAppScreen> {
     );
   }
 }
+
+class _VideoScreen extends StatefulWidget {
+  const _VideoScreen({
+    required this.video,
+    required this.isSaved,
+    required this.onSave,
+  });
+
+  final _Video video;
+  final bool isSaved;
+  final VoidCallback onSave;
+
+  @override
+  State<_VideoScreen> createState() => _VideoScreenState();
+}
+
+class _VideoScreenState extends State<_VideoScreen> {
+  late bool _isSaved = widget.isSaved;
+
+  String get _playerHtml => '''
+    <!doctype html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          html, body { margin: 0; width: 100%; height: 100%; background: #000; }
+          video { display: block; width: 100%; height: 100%; object-fit: contain; }
+        </style>
+      </head>
+      <body>
+        <video controls playsinline preload="metadata">
+          <source src="${widget.video.url}" type="video/mp4">
+          Your browser does not support HTML5 video.
+        </video>
+      </body>
+    </html>
+  ''';
+
+  @override
+  Widget build(BuildContext context) {
+    final video = widget.video;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Now playing'),
+        actions: [
+          IconButton(
+            tooltip: _isSaved ? 'Remove from library' : 'Save to library',
+            onPressed: () {
+              widget.onSave();
+              setState(() => _isSaved = !_isSaved);
+            },
+            icon: Icon(
+              _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            ),
+          ),
+        ],
+      ),
+      body: ListView(
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: InAppWebView(
+              initialData: InAppWebViewInitialData(data: _playerHtml),
+              initialSettings: InAppWebViewSettings(
+                javaScriptEnabled: false,
+                allowsInlineMediaPlayback: true,
+                mediaPlaybackRequiresUserGesture: true,
+                transparentBackground: true,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  video.title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${video.creator}  ·  ${video.category}  ·  Sample video',
+                  style: const TextStyle(color: Colors.white60, fontSize: 13),
+                ),
+                const SizedBox(height: 18),
+                const Divider(color: Color(0xFF2A2B31)),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: video.accent.withOpacity(0.24),
+                      child: Icon(video.creatorIcon, color: video.accent),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            video.creator,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${video.category} · Sample video',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  video.description,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    height: 1.55,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Sample videos are streamed from a public demo library. '
+                  'Playback requires an internet connection.',
+                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Video {
+  const _Video({
+    required this.id,
+    required this.title,
+    required this.creator,
+    required this.category,
+    required this.url,
+    required this.description,
+    required this.artworkIcon,
+    required this.creatorIcon,
+    required this.accent,
+    required this.colors,
+  });
+
+  final String id;
+  final String title;
+  final String creator;
+  final String category;
+  final String url;
+  final String description;
+  final IconData artworkIcon;
+  final IconData creatorIcon;
+  final Color accent;
+  final List<Color> colors;
+}
+
+const List<String> _categories = [
+  'All',
+  'Animation',
+  'Nature',
+];
+
+const List<_Video> _videos = [
+  _Video(
+    id: 'big-buck-bunny',
+    title: 'Big Buck Bunny — animated film trailer',
+    creator: 'Blender Open Movies',
+    category: 'Animation',
+    url: 'https://media.w3.org/2010/05/bunny/trailer.mp4',
+    description:
+        'A playful animated film trailer about a gentle giant and a forest '
+        'full of surprises, available as a public sample stream.',
+    artworkIcon: Icons.forest_rounded,
+    creatorIcon: Icons.movie_creation_outlined,
+    accent: Color(0xFFB8F28B),
+    colors: [Color(0xFF145A45), Color(0xFF7FA956)],
+  ),
+  _Video(
+    id: 'sintel',
+    title: 'Sintel — a cinematic animated short',
+    creator: 'Blender Open Movies',
+    category: 'Animation',
+    url: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
+    description:
+        'A sweeping animated fantasy trailer, presented here as a public '
+        'sample video for the OpenWave player.',
+    artworkIcon: Icons.auto_awesome_rounded,
+    creatorIcon: Icons.auto_awesome,
+    accent: Color(0xFFF4BB83),
+    colors: [Color(0xFF873A35), Color(0xFFE68B48)],
+  ),
+  _Video(
+    id: 'elephants-dream',
+    title: 'A quiet moment among the flowers',
+    creator: 'Open Nature',
+    category: 'Nature',
+    url:
+        'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+    description:
+        'Take a short pause and watch flowers sway in the breeze. This public '
+        'sample clip is ready to stream in the built-in player.',
+    artworkIcon: Icons.local_florist_rounded,
+    creatorIcon: Icons.eco_outlined,
+    accent: Color(0xFFFFB4D2),
+    colors: [Color(0xFF82436D), Color(0xFFB36B86)],
+  ),
+];
